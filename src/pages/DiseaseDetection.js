@@ -60,6 +60,8 @@ const DiseaseDetection = () => {
   const [prediction, setPrediction] = useState(null);
   const [aiStatus, setAiStatus] = useState(null);
   const [testingAi, setTestingAi] = useState(false);
+  const [treatment, setTreatment] = useState(null);
+  const [treatmentLoading, setTreatmentLoading] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -112,6 +114,7 @@ const DiseaseDetection = () => {
     setLoading(true);
     setError(null);
     setPrediction(null);
+    setTreatment(null);
 
     const formData = new FormData();
     formData.append('image', selectedImage);
@@ -135,13 +138,35 @@ const DiseaseDetection = () => {
 
       setPrediction({
         disease: data.disease,
-        confidence: data.confidence,
-        treatment: data.treatment
+        confidence: data.confidence
       });
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGetTreatment = async () => {
+    if (!prediction?.disease) return;
+    setTreatmentLoading(true);
+    setTreatment(null);
+    try {
+      const response = await fetch(`${BASE_URL}/api/treatment-solution`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          disease_name: prediction.disease,
+          language: i18n.language === 'hi' ? 'Hindi' : i18n.language === 'te' ? 'Telugu' : 'English',
+        }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setTreatment(data.treatment);
+    } catch (err) {
+      setTreatment(`Error: ${err.message}`);
+    } finally {
+      setTreatmentLoading(false);
     }
   };
 
@@ -300,14 +325,58 @@ const DiseaseDetection = () => {
                   </Typography>
 
                   {prediction ? (
-                    <PredictionResult
-                      prediction={{
-                        disease: prediction.disease,
-                        confidence: prediction.confidence,
-                        treatment: prediction.treatment
-                      }}
-                      onRetry={handleDeleteImage}
-                    />
+                    <Box sx={{ mt: 3, textAlign: 'center' }}>
+                      <Paper elevation={3} sx={{ p: 3, mt: 3, backgroundColor: '#ffffff', borderRadius: 2 }}>
+                        <Typography variant="h6" sx={{ color: '#000000', fontWeight: 'bold', mb: 2, fontSize: '1.2rem' }}>
+                          {t('diseaseDetection.result.disease')}
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: '#000000', fontSize: '1.1rem', fontWeight: 'medium' }}>
+                          {prediction.disease}
+                        </Typography>
+                        <Divider sx={{ my: 2 }} />
+                        <Typography variant="h6" sx={{ color: '#000000', fontWeight: 'bold', mb: 2, fontSize: '1.2rem' }}>
+                          {t('diseaseDetection.result.confidence')}
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: '#000000', fontSize: '1.1rem', fontWeight: 'medium' }}>
+                          {prediction.confidence?.toFixed(2)}%
+                        </Typography>
+                        <Divider sx={{ my: 2 }} />
+                        <Box sx={{ mb: 3 }}>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleGetTreatment}
+                            disabled={treatmentLoading}
+                            sx={{ textTransform: 'none', fontWeight: 'bold', borderRadius: '8px', px: 4, py: 1 }}
+                          >
+                            {treatmentLoading ? 'Loading Treatment...' : 'Treatment Solution'}
+                          </Button>
+                        </Box>
+                        {treatment && (
+                          <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" sx={{ color: '#000000', fontWeight: 'bold', mb: 2, fontSize: '1.2rem' }}>
+                              {t('diseaseDetection.result.treatment')}
+                            </Typography>
+                            <Paper variant="outlined" sx={{ p: 2, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
+                              <Typography sx={{ color: '#000000', fontSize: '1rem', lineHeight: 1.6 }}>
+                                {treatment}
+                              </Typography>
+                            </Paper>
+                          </Box>
+                        )}
+                        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleDeleteImage}
+                            startIcon={<RefreshIcon />}
+                            sx={{ textTransform: 'none', fontWeight: 'bold', borderRadius: '8px', px: 4, py: 1 }}
+                          >
+                            {t('diseaseDetection.result.retry')}
+                          </Button>
+                        </Box>
+                      </Paper>
+                    </Box>
                   ) : (aiStatus?.success && !selectedImage && !error) ? (
                     <Box>
                       <Typography variant="h6" sx={{ mb: 2, color: '#000000' }}>
@@ -350,40 +419,6 @@ const DiseaseDetection = () => {
                     <Typography variant="body1" sx={{ color: '#000000' }}>
                        {t('diseaseDetection.no_image_selected_or_ai_down')}
                     </Typography>
-                  )}
-
-                  {prediction && (
-                    <Box sx={{ mt: 3, textAlign: 'center' }}>
-                      <Button
-                        variant="outlined"
-                        onClick={handleDeleteImage}
-                        startIcon={<RefreshIcon />}
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 'bold',
-                          borderRadius: '8px'
-                        }}
-                      >
-                        {t('diseaseDetection.result.retry')}
-                      </Button>
-                    </Box>
-                  )}
-
-                   {!prediction && selectedImage && !loading && !error && aiStatus?.success && (
-                    <Box sx={{ mt: 3, textAlign: 'center' }}>
-                      <Button
-                        variant="outlined"
-                         onClick={handleDeleteImage}
-                        startIcon={<RefreshIcon />}
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 'bold',
-                          borderRadius: '8px'
-                        }}
-                      >
-                        {t('diseaseDetection.back_to_upload')}
-                      </Button>
-                    </Box>
                   )}
 
                 </Box>
